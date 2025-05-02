@@ -12,7 +12,7 @@ import (
 func TestClose(t *testing.T) {
 	bus := New()
 
-	bus.Subscribe("foo", func(msg any) {})
+	_, _ = bus.Subscribe("foo", func(msg any) {})
 
 	err := bus.Close(context.Background())
 	assert.NoError(t, err)
@@ -21,11 +21,11 @@ func TestClose(t *testing.T) {
 func TestCloseWithDeadline(t *testing.T) {
 	bus := New()
 
-	bus.Subscribe("foo", func(msg any) {
+	_, _ = bus.Subscribe("foo", func(msg any) {
 		time.Sleep(1 * time.Second)
 	})
 
-	bus.Publish("foo", "bar")
+	_ = bus.Publish("foo", "bar")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -40,7 +40,7 @@ func TestCloseWithDeadline(t *testing.T) {
 
 func TestSubscribeAfterClose(t *testing.T) {
 	bus := New()
-	bus.Close(context.Background())
+	_ = bus.Close(context.Background())
 
 	_, err := bus.Subscribe("foo", func(msg any) {})
 	assert.Equal(t, ErrClosed, err)
@@ -48,7 +48,7 @@ func TestSubscribeAfterClose(t *testing.T) {
 
 func TestPublishAfterClose(t *testing.T) {
 	bus := New()
-	bus.Close(context.Background())
+	_ = bus.Close(context.Background())
 
 	err := bus.Publish("foo", "bar")
 	assert.Equal(t, ErrClosed, err)
@@ -67,9 +67,9 @@ func TestDoubleClose(t *testing.T) {
 func TestCloseWithMultipleSubscribers(t *testing.T) {
 	bus := New()
 
-	bus.Subscribe("foo", func(msg any) {})
-	bus.Subscribe("bar", func(msg any) {})
-	bus.Subscribe("baz", func(msg any) {})
+	_, _ = bus.Subscribe("foo", func(msg any) {})
+	_, _ = bus.Subscribe("bar", func(msg any) {})
+	_, _ = bus.Subscribe("baz", func(msg any) {})
 
 	err := bus.Close(context.Background())
 	assert.NoError(t, err)
