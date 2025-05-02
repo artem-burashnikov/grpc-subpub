@@ -108,7 +108,7 @@ func (sub *subscription) listen() {
 		for len(sub.queue) == 0 && !sub.closed {
 			sub.cond.Wait()
 		}
-		// Exit if unsubscribed was called and queue is drained.
+		// Exit if `Unsubscribe` was called and queue is drained.
 		if len(sub.queue) == 0 && sub.closed {
 			sub.queueMu.Unlock()
 			return
