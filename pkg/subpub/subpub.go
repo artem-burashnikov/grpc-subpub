@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// ErrClosed is returned when Publish or Subscribe is called after Close.
+// ErrClosed is returned when Publish, Subscribe or Close is called after Close.
 var ErrClosed = errors.New("subpub system is closed")
 
 // MessageHandler is a callback function that processes messages delivered to subscribers.
