@@ -60,11 +60,10 @@ type subscription struct {
 
 func (s *subPub) Subscribe(subject string, cb MessageHandler) (Subscription, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.closed {
-		s.mu.Unlock()
 		return nil, ErrClosed
 	}
-	defer s.mu.Unlock()
 
 	sub := &subscription{
 		subpub:            s,
@@ -143,13 +142,11 @@ func (sub *subscription) processMessages(ctx context.Context, done chan<- struct
 
 func (s *subPub) Publish(subject string, msg any) error {
 	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	if s.closed {
-		s.mu.RUnlock()
 		return ErrClosed
 	}
-
-	defer s.mu.RUnlock()
 
 	for _, sub := range s.subs[subject] {
 		sub <- msg
