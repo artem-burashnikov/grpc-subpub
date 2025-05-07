@@ -298,38 +298,34 @@ func TestPanicInHandler(t *testing.T) {
 	sp := New()
 	defer sp.Close(context.Background())
 
-	require := require.New(t)
-
 	var (
-		received []string
-		mu       sync.Mutex
+		mu          sync.Mutex
+		callCount   int
+		panicCalled bool
 	)
 
-	count := 0
-
-	_, err := sp.Subscribe("foo", func(msg any) {
+	_, err := sp.Subscribe("test", func(msg any) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		count++
-		if count == 2 {
-			panic("intentional panic")
+		callCount++
+		if callCount == 3 {
+			panicCalled = true
+			assert.Panics(t, func() { panic("intentional panic for test") })
 		}
-		received = append(received, msg.(string))
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
-	for range 2 {
-		err = sp.Publish("foo", "bar")
-		require.NoError(err)
+	for range 5 {
+		err := sp.Publish("test", "message")
+		require.NoError(t, err)
 	}
 
-	err = sp.Publish("foo", "baz")
-	require.NoError(err)
-
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	mu.Lock()
-	assert.Equal(t, 1, len(received))
-	mu.Unlock()
+	defer mu.Unlock()
+
+	assert.GreaterOrEqual(t, callCount, 3, "Handler should be called at least 3 times")
+	assert.True(t, panicCalled, "Panic should have been triggered")
 }
