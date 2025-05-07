@@ -1,0 +1,8 @@
+# The only possible value is "2".
+version: "2"
+
+linters:
+  exclusions:
+      paths:
+      - '(.+)_test\.go'
+
