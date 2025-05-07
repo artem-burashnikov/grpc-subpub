@@ -44,9 +44,9 @@ func New() SubPub {
 
 type subPub struct {
 	mu     sync.RWMutex
-	subs   map[string][]chan any
+	subs   map[string][]chan any // subject -> []subscribers
 	closed bool
-	wg     sync.WaitGroup
+	wg     sync.WaitGroup // allows the subpub system to track active subscription goroutines
 }
 
 type subscription struct {
@@ -56,7 +56,6 @@ type subscription struct {
 	handler           MessageHandler
 	localRunningQueue *queue.Queue // local message queue
 	closed            atomic.Bool
-	// wg                sync.WaitGroup // number of active subscriptions
 }
 
 func (s *subPub) Subscribe(subject string, cb MessageHandler) (Subscription, error) {
@@ -83,14 +82,18 @@ func (s *subPub) Subscribe(subject string, cb MessageHandler) (Subscription, err
 	return sub, nil
 }
 
+// listen reads from the message bus channel while it is open and puts all incoming messages into the local running queue.
+// After the bus is closed it drains the remaining local queue and terminates.
 func (sub *subscription) listen() {
 	defer sub.subpub.wg.Done()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Signals when message processing is complete.
 	done := make(chan struct{})
 
+	// Process messages in the background.
 	go sub.processMessages(ctx, done)
 
 	for msg := range sub.bus {
@@ -179,13 +182,16 @@ func (s *subPub) Close(ctx context.Context) error {
 		return ErrClosed
 	}
 
+	s.closed = true
+
+	// Close all subscriber channels
 	for _, subs := range s.subs {
 		for _, sub := range subs {
 			close(sub)
 		}
 	}
 
-	s.closed = true
+	// Clear subscribers
 	s.subs = nil
 	s.mu.Unlock()
 
