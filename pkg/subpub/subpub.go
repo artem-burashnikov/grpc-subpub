@@ -1,12 +1,15 @@
-// Package subpub provides a simple in-memory publish-subscribe mechanism.
-// It supports asynchronous message delivery with FIFO ordering per subscriber.
-// A slow subscriber does not block others.
 package subpub
 
 import (
 	"context"
 	"errors"
+	"log"
+	"runtime/debug"
+	"slices"
 	"sync"
+	"sync/atomic"
+
+	"github.com/artem-burashnikov/grpc-subpub/pkg/subpub/internal/queue"
 )
 
 // ErrClosed is returned when Publish, Subscribe or Close is called after Close.
@@ -18,10 +21,9 @@ type MessageHandler func(msg any)
 // Subscription represents a subscriber's active interest in a subject.
 type Subscription interface {
 	// Unsibscribe will remove interest in the current subject subscription is for.
-	Unsibscribe()
+	Unsubscribe()
 }
 
-// A SubPub instance allows clients to subscribe to string-based subjects, publish messages, and shut down the system.
 type SubPub interface {
 	// Subscribe creates an asynchronous queue subscriber on the given subject.
 	Subscribe(subject string, cb MessageHandler) (Subscription, error)
@@ -34,54 +36,46 @@ type SubPub interface {
 	Close(ctx context.Context) error
 }
 
-// New creates and returns a new SubPub instance.
 func New() SubPub {
 	return &subPub{
-		subs: make(map[string]map[*subscription]struct{}),
+		subs: make(map[string][]chan any),
 	}
 }
 
-// subPub is an in-memory event bus that manages subscriptions and message delivery.
 type subPub struct {
-	mu     sync.RWMutex                          // protects subs map and closed flag
-	subs   map[string]map[*subscription]struct{} // subject -> set of subscriptions
-	closed bool                                  // indicates whether Close has been called
-	wg     sync.WaitGroup                        // tracks active listener goroutines
+	mu     sync.RWMutex
+	subs   map[string][]chan any
+	closed bool
+	wg     sync.WaitGroup
 }
 
-// subscription holds state for a single subscriber on a particular subject.
 type subscription struct {
-	eventBus *subPub        // reference back to pub‑sub system for cleanup
-	subject  string         // topic this subscription listens to
-	handler  MessageHandler // callback for incoming messages
-
-	queueMu sync.Mutex // protects queue and closed flag
-	cond    *sync.Cond // signals when new messages arrive or subscription closes
-	queue   []any      // unbounded FIFO queue of pending messages
-	closed  bool       // indicates whether this subscription has been unsubscribed
+	subpub            *subPub  // parent sub-pub system
+	bus               chan any // message bus
+	subject           string   // subject the subscription is for
+	handler           MessageHandler
+	localRunningQueue *queue.Queue // local message queue
+	closed            atomic.Bool
+	// wg                sync.WaitGroup // number of active subscriptions
 }
 
-// Subscribe registers a handler for the given subject and starts its listener goroutine.
 func (s *subPub) Subscribe(subject string, cb MessageHandler) (Subscription, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.closed {
+		s.mu.Unlock()
 		return nil, ErrClosed
 	}
+	defer s.mu.Unlock()
 
 	sub := &subscription{
-		eventBus: s,
-		subject:  subject,
-		handler:  cb,
-		queue:    make([]any, 0),
+		subpub:            s,
+		bus:               make(chan any, 1),
+		subject:           subject,
+		handler:           cb,
+		localRunningQueue: queue.New(),
 	}
-	sub.cond = sync.NewCond(&sub.queueMu)
 
-	if s.subs[subject] == nil {
-		s.subs[subject] = make(map[*subscription]struct{})
-	}
-	s.subs[subject][sub] = struct{}{}
+	s.subs[subject] = append(s.subs[subject], sub.bus)
 
 	s.wg.Add(1)
 	go sub.listen()
@@ -89,100 +83,113 @@ func (s *subPub) Subscribe(subject string, cb MessageHandler) (Subscription, err
 	return sub, nil
 }
 
-// enqueue adds a message to the subscription's queue and notifies the listener.
-func (sub *subscription) enqueue(msg any) {
-	sub.queueMu.Lock()
-	if !sub.closed {
-		sub.queue = append(sub.queue, msg)
-		sub.cond.Signal() // wake up one waiting listener
+func (sub *subscription) listen() {
+	defer sub.subpub.wg.Done()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+
+	go sub.processMessages(ctx, done)
+
+	for msg := range sub.bus {
+		sub.localRunningQueue.Enqueue(msg)
 	}
-	sub.queueMu.Unlock()
+
+	cancel()
+	<-done
+
+	sub.drainQueue()
 }
 
-// listen runs in its own goroutine to process queued messages in FIFO order.
-func (sub *subscription) listen() {
-	defer sub.eventBus.wg.Done()
-	for {
-		sub.queueMu.Lock()
-		// Wait until there is a message or subscription is closed.
-		for len(sub.queue) == 0 && !sub.closed {
-			sub.cond.Wait()
+func (sub *subscription) drainQueue() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("panic in drainQueue: %v\nstack: %s", r, debug.Stack())
 		}
-		// Exit if `Unsubscribe` was called and queue is drained.
-		if len(sub.queue) == 0 && sub.closed {
-			sub.queueMu.Unlock()
-			return
-		}
-		// Dequeue next message.
-		msg := sub.queue[0]
-		sub.queue = sub.queue[1:]
-		sub.queueMu.Unlock()
+	}()
 
-		// Invoke handler outside the lock to avoid blocking enqueue.
+	for {
+		msg, ok := sub.localRunningQueue.Dequeue()
+		if !ok {
+			break
+		}
 		sub.handler(msg)
 	}
 }
 
-// Publish sends the message to all subscribers of the subject.
-//
-// Slow subscribers won't block the publisher since this method doesn't wait on handlers, it just enques the message.
+func (sub *subscription) processMessages(ctx context.Context, done chan<- struct{}) {
+	defer close(done)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("panic in processMessages: %v\nstack: %s", r, debug.Stack())
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if msg, ok := sub.localRunningQueue.Dequeue(); ok {
+				sub.handler(msg)
+			}
+		}
+	}
+}
+
 func (s *subPub) Publish(subject string, msg any) error {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 
 	if s.closed {
+		s.mu.RUnlock()
 		return ErrClosed
 	}
 
-	for sub := range s.subs[subject] {
-		sub.enqueue(msg)
+	defer s.mu.RUnlock()
+
+	for _, sub := range s.subs[subject] {
+		sub <- msg
 	}
 
 	return nil
 }
 
-// Unsibscribe removes the subscription and signals its listeners to exit.
-func (sub *subscription) Unsibscribe() {
-	eb := sub.eventBus
-
-	// Remove the subscription from eventBus.
-	eb.mu.Lock()
-	delete(eb.subs[sub.subject], sub)
-	if len(eb.subs[sub.subject]) == 0 {
-		delete(eb.subs, sub.subject)
+func (sub *subscription) Unsubscribe() {
+	if sub.closed.Load() {
+		return
 	}
-	eb.mu.Unlock()
+	sub.closed.Store(true)
 
-	// Signal listeners to terminate after draining queue.
-	sub.queueMu.Lock()
-	sub.closed = true
-	sub.cond.Broadcast() // wake up all listeners that are waiting
-	sub.queueMu.Unlock()
+	sub.subpub.mu.Lock()
+	defer sub.subpub.mu.Unlock()
+	for i, bus := range sub.subpub.subs[sub.subject] {
+		if bus == sub.bus {
+			sub.subpub.subs[sub.subject] = slices.Delete(sub.subpub.subs[sub.subject], i, i+1)
+			close(sub.bus)
+			break
+		}
+	}
 }
 
-// Close shuts down the pub‑sub system, unsubscribes all subscribers, and waits util all handlers are done or the context is canceled.
 func (s *subPub) Close(ctx context.Context) error {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
 		return ErrClosed
 	}
-	// Mark the system as `closed` and send a signal to all active subscriptions.
-	s.closed = true
+
 	for _, subs := range s.subs {
-		for sub := range subs {
-			sub.queueMu.Lock()
-			sub.closed = true
-			sub.cond.Broadcast()
-			sub.queueMu.Unlock()
+		for _, sub := range subs {
+			close(sub)
 		}
 	}
+
+	s.closed = true
 	s.subs = nil
 	s.mu.Unlock()
 
-	// Wait for all listener goroutines or context cancellation.
 	done := make(chan struct{})
-
 	go func() {
 		s.wg.Wait()
 		close(done)
