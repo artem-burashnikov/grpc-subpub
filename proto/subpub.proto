@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/artem-burashnikov/subpubv1;subpubv1";
+
+service PubSub {
+  // Subscription (server sends event stream)
+  rpc Subscribe(SubscribeRequest) returns (stream Event);
+
+  // Publishing (classical request-response)
+  rpc Publish(PublishRequest) returns (google.protobuf.Empty);
+}
+
+message SubscribeRequest {
+  string key = 1;
+}
+
+message PublishRequest {
+  string key = 1;
+  string data = 2;
+}
+message Event {
+  string data = 1;
+}
