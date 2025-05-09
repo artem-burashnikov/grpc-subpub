@@ -5,4 +5,3 @@ linters:
   exclusions:
       paths:
       - '(.+)_test\.go'
-
