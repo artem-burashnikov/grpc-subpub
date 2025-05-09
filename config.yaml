@@ -1,0 +1,11 @@
+---
+app:
+  environment: dev # dev, prod
+  name: subpub-service
+  version: 0.1.0
+
+grpc_server:
+  port: 50051
+  max_idle: 30s
+  timeout: 5s
+  shutdown_period: 7s
