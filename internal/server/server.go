@@ -73,6 +73,11 @@ func (s *Server) Run() {
 }
 
 func (s *Server) GracefulStop() {
+	if s == nil {
+		log.Fatal("gRPC server is not initialized")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), s.cfg.GRPCServer.ShutdownPeriod)
 	defer cancel()
 
@@ -80,8 +85,8 @@ func (s *Server) GracefulStop() {
 	errCh := make(chan error, 1)
 
 	go func() {
-		defer close(done)
 		defer close(errCh)
+		defer close(done)
 
 		s.grpc.GracefulStop()
 
@@ -104,6 +109,11 @@ func (s *Server) GracefulStop() {
 }
 
 func (s *Server) Publish(ctx context.Context, req *spv1.PublishRequest) (*emptypb.Empty, error) {
+	if s == nil {
+		log.Fatal("gRPC server is not initialized")
+		return nil, status.Error(codes.Unknown, "gRPC server is not initialized")
+	}
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is nil")
 	}
@@ -152,6 +162,11 @@ func (s *Server) Publish(ctx context.Context, req *spv1.PublishRequest) (*emptyp
 }
 
 func (s *Server) Subscribe(req *spv1.SubscribeRequest, stream spv1.PubSub_SubscribeServer) error {
+	if s == nil {
+		log.Fatal("gRPC server is not initialized")
+		return status.Error(codes.Unknown, "gRPC server is not initialized")
+	}
+
 	if req == nil {
 		return status.Error(codes.InvalidArgument, "request is nil")
 	}
