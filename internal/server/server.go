@@ -192,7 +192,7 @@ func (s *Server) Subscribe(req *spv1.SubscribeRequest, stream spv1.PubSub_Subscr
 				event, ok := msg.(*spv1.Event)
 				if !ok {
 					s.log.Error("failed to parse message: invalid message type")
-					status.Error(codes.Internal, "internal server error")
+					errCh <- status.Error(codes.Internal, "internal server error")
 					return
 				}
 
