@@ -1,4 +1,4 @@
-.PHONY: test coverage clean
+.PHONY: test clean
 
 test:
 	@go test -v -race ./...
