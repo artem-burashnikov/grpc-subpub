@@ -56,6 +56,7 @@ type subscription struct {
 	handler           MessageHandler
 	localRunningQueue *queue.Queue // local message queue
 	closed            atomic.Bool
+	done              chan struct{}
 }
 
 func (s *subPub) Subscribe(subject string, cb MessageHandler) (Subscription, error) {
@@ -71,6 +72,7 @@ func (s *subPub) Subscribe(subject string, cb MessageHandler) (Subscription, err
 		subject:           subject,
 		handler:           cb,
 		localRunningQueue: queue.New(),
+		done:              make(chan struct{}),
 	}
 
 	s.subs[subject] = append(s.subs[subject], sub.bus)
@@ -85,24 +87,22 @@ func (s *subPub) Subscribe(subject string, cb MessageHandler) (Subscription, err
 // After the bus is closed it drains the remaining local queue and terminates.
 func (sub *subscription) listen() {
 	defer sub.subpub.wg.Done()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Signals when message processing is complete.
-	done := make(chan struct{})
-
-	// Process messages in the background.
-	go sub.processMessages(ctx, done)
-
-	for msg := range sub.bus {
-		sub.localRunningQueue.Enqueue(msg)
+	defer close(sub.done)
+	for {
+		select {
+		case msg, ok := <-sub.bus:
+			if !ok {
+				sub.drainQueue()
+				return
+			}
+			sub.localRunningQueue.Enqueue(msg)
+			if msg, ok := sub.localRunningQueue.Dequeue(); ok {
+				sub.handler(msg)
+			}
+		case <-sub.done:
+			return
+		}
 	}
-
-	cancel()
-	<-done
-
-	sub.drainQueue()
 }
 
 func (sub *subscription) drainQueue() {
@@ -118,25 +118,6 @@ func (sub *subscription) drainQueue() {
 			break
 		}
 		sub.handler(msg)
-	}
-}
-
-func (sub *subscription) processMessages(ctx context.Context, done chan<- struct{}) {
-	defer close(done)
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("panic in processMessages: %v\nstack: %s", r, debug.Stack())
-		}
-	}()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if msg, ok := sub.localRunningQueue.Dequeue(); ok {
-				sub.handler(msg)
-			}
-		}
 	}
 }
 
@@ -156,13 +137,14 @@ func (s *subPub) Publish(subject string, msg any) error {
 }
 
 func (sub *subscription) Unsubscribe() {
-	if sub.closed.Load() {
+	if !sub.closed.CompareAndSwap(false, true) {
 		return
 	}
-	sub.closed.Store(true)
 
 	sub.subpub.mu.Lock()
 	defer sub.subpub.mu.Unlock()
+
+	// Remove subscription from the map
 	for i, bus := range sub.subpub.subs[sub.subject] {
 		if bus == sub.bus {
 			sub.subpub.subs[sub.subject] = slices.Delete(sub.subpub.subs[sub.subject], i, i+1)
@@ -170,6 +152,8 @@ func (sub *subscription) Unsubscribe() {
 			break
 		}
 	}
+
+	<-sub.done
 }
 
 func (s *subPub) Close(ctx context.Context) error {
