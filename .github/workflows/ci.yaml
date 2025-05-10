@@ -25,5 +25,4 @@ jobs:
           version: v2.0
 
       - name: Run unit tests
-        working-directory: ./pkg/subpub
         run: make unit
