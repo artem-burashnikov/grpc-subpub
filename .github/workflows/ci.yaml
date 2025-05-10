@@ -24,10 +24,6 @@ jobs:
         with:
           version: v2.0
 
-      - name: Run tests
+      - name: Run unit tests
         working-directory: ./pkg/subpub
-        run: make coverage
-
-      - name: Clean
-        working-directory: ./pkg/subpub
-        run: make clean
+        run: make unit
