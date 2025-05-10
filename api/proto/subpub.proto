@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/artem-burashnikov/subpubv1;subpubv1";
+option go_package = "github.com/artem-burashnikov/grpc-subpub/api/pb;pbv1";
 
 service PubSub {
   // Subscription (server sends event stream)

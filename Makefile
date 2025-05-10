@@ -3,9 +3,10 @@
 lint: protolint golint
 
 protobuf:
-	protoc --go_out=. --go_opt=paths=source_relative \
-			--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-			proto/subpub.proto
+	protoc --proto_path=api/proto \
+			--go_out=api/pb --go_opt=paths=source_relative \
+			--go-grpc_out=api/pb --go-grpc_opt=paths=source_relative \
+			api/proto/subpub.proto
 
 protolint:
 	protolint proto/*
