@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/artem-burashnikov/grpc-subpub/pkg/subpub/internal/queue"
+	"github.com/artem-burashnikov/grpc-subpub/service/pkg/subpub/internal/queue"
 )
 
 // ErrClosed is returned when Publish, Subscribe or Close is called after Close.

@@ -1,0 +1,13 @@
+services:
+  subpub:
+    build:
+      context: service
+    container_name: apiserver
+    restart: unless-stopped
+    ports:
+      - 50051:50051
+    volumes:
+      - type: bind
+        source: ./config.yaml
+        target: /config.yaml
+        read_only: true
