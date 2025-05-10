@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 
 	pb "github.com/artem-burashnikov/grpc-subpub/service/api/pb"
 	"google.golang.org/grpc"
@@ -11,9 +12,11 @@ import (
 )
 
 func main() {
-	// Create a new gRPC client connection to the server running on localhost:50051.
-	// `insecure.NewCredentials()` is used because we're not using TLS.
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Start the gRPC server in a separate process on localhost:50051.
+	// Create a new gRPC client connection to the server.
+	const addr = "localhost:50051"
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,9 +29,10 @@ func main() {
 	msgChan := make(chan string, 2)
 
 	// Optional sync point for waiting until subscription is confirmed.
-	ready := make(chan struct{})
+	var wg sync.WaitGroup
 
 	// Start a goroutine to handle subscription and receiving messages.
+	wg.Add(1)
 	go func(msgChan chan string) {
 		defer close(msgChan)
 
@@ -51,10 +55,10 @@ func main() {
 		}
 
 		// Signal that subscription is ready.
-		close(ready)
+		wg.Done()
 
 		// Start receiving messages from the stream and forward them to msgChan.
-		for range cap(msgChan) {
+		for range 2 {
 			event, err := stream.Recv()
 			if err != nil {
 				log.Fatal("failed to receive message:", err)
@@ -65,7 +69,7 @@ func main() {
 	}(msgChan)
 
 	// Wait for subscription confirmation before publishing.
-	<-ready
+	wg.Wait()
 
 	// Start a goroutine to publish two messages to the "test" topic.
 	go func() {
