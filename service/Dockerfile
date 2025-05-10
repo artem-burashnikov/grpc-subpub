@@ -16,7 +16,7 @@ RUN apt update && apt install -y protobuf-compiler && \
 
 ENV PATH="$PATH:$(go env GOPATH)/bin"
 
-WORKDIR src
+WORKDIR /src
 COPY . .
 
 RUN protoc --proto_path=api/proto --go_out=api/pb --go_opt=paths=source_relative \
@@ -24,10 +24,11 @@ RUN protoc --proto_path=api/proto --go_out=api/pb --go_opt=paths=source_relative
            api/proto/subpub.proto
 
 ENV CGO_ENABLED=0
-RUN go build -trimpath -ldflags "-s -w" -o /go/bin/service ./cmd/server
+RUN go build -trimpath -ldflags "-s -w" -o /go/bin/app ./cmd/server
 
 FROM scratch AS final
 LABEL author="a.burashnikov"
-COPY --from=build /go/bin/service /service
+COPY --from=build /go/bin/app /app
+COPY /config.yaml /config.yaml
 
-ENTRYPOINT [ "/service" ]
+ENTRYPOINT [ "/app" ]
