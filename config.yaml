@@ -6,6 +6,9 @@ app:
 
 grpc_server:
   port: 50051
-  max_idle: 30s
+  max_idle: 10s
   timeout: 5s
+  startup_delay: 1s
   shutdown_period: 7s
+  publish_retry_attempts: 3
+  publish_retry_backoff: 100ms
