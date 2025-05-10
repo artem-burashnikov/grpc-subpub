@@ -20,10 +20,13 @@ func main() {
 	cfg := Must(config.Load(defaultConfigPath))
 
 	log := logger.NewZap(cfg.App.Environment)
+	defer log.Sync()
 
 	sp := subpub.New()
 
 	s := server.New(cfg, log, sp)
 
-	s.Run()
+	if err := s.Run(); err != nil {
+		panic(err)
+	}
 }
