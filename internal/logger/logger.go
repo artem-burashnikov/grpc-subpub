@@ -1,13 +1,15 @@
 package logger
 
 import (
+	"time"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 const (
-	EnvDev  = "dev"
-	EnvProd = "prod"
+	EnvDevelopment = "dev"
+	EnvProduction  = "prod"
 )
 
 // All methods log a message with some additional context.
@@ -29,15 +31,18 @@ func NewZap(env string) *ZapLogger {
 	var loggerConfig zap.Config
 
 	switch env {
-	case EnvDev:
+	case EnvDevelopment:
 		loggerConfig = zap.NewDevelopmentConfig()
-	case EnvProd:
+	case EnvProduction:
 		loggerConfig = zap.NewProductionConfig()
 	default:
 		loggerConfig = zap.NewDevelopmentConfig()
 	}
 
-	loggerConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	// YY-MM-DD HH:MM:SS.sss
+	loggerConfig.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(t.Format("2006-01-02 15:04:05.000"))
+	}
 	loggerConfig.DisableCaller = true
 
 	logger := zap.Must(loggerConfig.Build())
@@ -66,13 +71,9 @@ func (l *ZapLogger) Fatal(msg string, keysAndValues ...any) {
 }
 
 func (l *ZapLogger) Sync() {
-	err := l.SugaredLogger.Sync()
-	if err != nil {
-		l.Warn("Logger sync error",
-			"error", err,
-		)
-		l.Fatal(err.Error())
-	}
+	// Ignoring.
+	// See: https://github.com/uber-go/zap/issues/328
+	_ = l.SugaredLogger.Sync()
 }
 
 var _ Logger = (*ZapLogger)(nil)
