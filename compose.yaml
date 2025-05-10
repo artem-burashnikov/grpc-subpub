@@ -2,6 +2,7 @@ services:
   subpub:
     build:
       context: service
+    image: apiserver:latest
     container_name: apiserver
     restart: unless-stopped
     ports:
@@ -11,3 +12,10 @@ services:
         source: ./config.yaml
         target: /config.yaml
         read_only: true
+
+  tests:
+    build:
+      context: tests
+    image: apitest:latest
+    container_name: apitest
+    restart: "no"

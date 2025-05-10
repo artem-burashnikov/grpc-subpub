@@ -6,7 +6,7 @@ down:
 	docker compose down -v
 
 run-tests:
-	docker run --rm --network=host tests:latest
+	docker run --rm apitest
 
 test:
 	make down
