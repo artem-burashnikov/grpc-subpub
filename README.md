@@ -42,7 +42,7 @@ The project is designed with modern software engineering patterns, such as grace
     - [Makefile Targets](#makefile-targets)
     - [Docker and Docker Compose](#docker-and-docker-compose)
       - [Use Docker Compose](#use-docker-compose)
-  - [Testing and Code Coverage](#testing-and-code-coverage)
+  - [Testing](#testing)
   - [License](#license)
 
 ---
@@ -309,31 +309,46 @@ Take a look at the [queue.go](service/pkg/subpub/internal/queue/queue.go) for im
 
 The project includes a Makefile for common tasks:
 
-Generate .pb:
+**Install useful and related go tools**:
+
+- protolint
+- goimports
+- grpcurl
+- protoc-gen-go
+- protoc-gen-go-grpc
+- golangci-lint
+
+```bash
+make tools
+```
+
+**Generate .pb**:
+
+The following command generates `subpub_grpc.pb.go` and `subpub.pb` and puts them into `<project_root>/service/api/pb` directory.
 
 ```bash
 make proto
 ```
 
-Run unit tests:
+**Run unit tests**:
 
 ```bash
 make test
 ```
 
-Run golangci-lint and protolint:
+**Run golangci-lint and protolint**:
 
 ```bash
 make lint
 ```
 
-Start the Server with the Docker Compose:
+**Start the Server with the Docker Compose**:
 
 ```bash
 make up
 ```
 
-Stop the Server:
+**Stop the Server**:
 
 ```bash
 make down
@@ -341,13 +356,13 @@ make down
 
 ### Docker and Docker Compose
 
-Build the Docker Image:
+**Build the Docker Image**:
 
 ```bash
 docker build -t grpc-subpub:latest ./service
 ```
 
-Run the Server with Docker:
+**Run the Server with Docker**:
 
 ```bash
 docker run -p 50051:50051 grpc-subpub:latest
@@ -366,7 +381,7 @@ This will:
 - Build the server image.
 - Start the server on port 50051.
 
-## Testing and Code Coverage
+## Testing
 
 [goleak](https://github.com/uber-go/goleak) is used to ensure there are no leaking goroutines.
 
@@ -377,7 +392,7 @@ cd service
 make test
 ```
 
-This will output `coverage.out` to the `service` directory.
+This will put `coverage.out` to the `service` directory.
 
 gRPC server test cases are available at [server_test.go](./service/internal/server/server_test.go).
 
