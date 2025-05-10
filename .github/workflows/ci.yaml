@@ -26,8 +26,4 @@ jobs:
           working-directory: service
 
       - name: Run unit tests
-        working-directory: service
-        run: make test
-
-      - name: Run API tests
         run: make test
