@@ -9,7 +9,7 @@ protobuf:
 			api/proto/subpub.proto
 
 protolint:
-	protolint proto/*
+	protolint api/proto/*
 
 golint:
 	golangci-lint run -v ./...
