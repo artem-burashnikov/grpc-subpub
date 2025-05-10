@@ -23,6 +23,8 @@ jobs:
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.0
+          working-directory: service
 
       - name: Run unit tests
-        run: make unit
+        working-directory: service
+        run: make test

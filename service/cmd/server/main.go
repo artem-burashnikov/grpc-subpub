@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/artem-burashnikov/grpc-subpub/internal/config"
-	"github.com/artem-burashnikov/grpc-subpub/internal/logger"
-	"github.com/artem-burashnikov/grpc-subpub/internal/server"
-	"github.com/artem-burashnikov/grpc-subpub/pkg/subpub"
+	"github.com/artem-burashnikov/grpc-subpub/service/internal/config"
+	"github.com/artem-burashnikov/grpc-subpub/service/internal/logger"
+	"github.com/artem-burashnikov/grpc-subpub/service/internal/server"
+	"github.com/artem-burashnikov/grpc-subpub/service/pkg/subpub"
 )
 
 func Must[T any](obj T, err error) T {

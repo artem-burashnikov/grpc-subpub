@@ -1,4 +1,4 @@
-module github.com/artem-burashnikov/grpc-subpub
+module github.com/artem-burashnikov/grpc-subpub/service
 
 go 1.24.2
 
