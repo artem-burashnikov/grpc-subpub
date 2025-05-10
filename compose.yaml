@@ -12,10 +12,3 @@ services:
         source: ./config.yaml
         target: /config.yaml
         read_only: true
-
-  tests:
-    build:
-      context: tests
-    image: apitest:latest
-    container_name: apitest
-    restart: "no"
