@@ -61,6 +61,7 @@ func (s *Server) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
+	defer lis.Close()
 
 	serverErr := make(chan error, 1)
 
