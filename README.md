@@ -35,6 +35,7 @@ The project is designed with modern software engineering patterns, such as grace
       - [Run with Docker](#run-with-docker)
       - [Run with Docker Compose](#run-with-docker-compose)
     - [Using the Test Client](#using-the-test-client)
+      - [Example: Subscribing and Publishing](#example-subscribing-and-publishing)
     - [Development Patterns](#development-patterns)
       - [Graceful Shutdown](#graceful-shutdown)
       - [Dependency Injection](#dependency-injection)
@@ -132,7 +133,8 @@ docker compose up --build
 
 A test client is provided in service/cmd/client/main.go. It demonstrates how to interact with the server.
 
-Example: Subscribing and Publishing
+#### Example: Subscribing and Publishing
+
 Start the server with:
 
 ```bash
@@ -153,16 +155,15 @@ The client will:
 2. Publish two messages: hello and hello again.
 3. Print the received messages in order.
 
-Below is the example client code:
+Below is the example client code. Ensure you have started the gRPC server in a separate process on `localhost:50051` before proceeding.
 
 ```go
 
 import (
-    // necessary imports
+    // ...
 )
 
 func main() {
-    // Start the gRPC server in a separate process on localhost:50051.
     // Create a new gRPC client connection to the server.
     const addr = "localhost:50051"
 
@@ -392,7 +393,7 @@ cd service
 make test
 ```
 
-This will put `coverage.out` to the `service` directory.
+This will put `cover.out` to the `service` directory.
 
 gRPC server test cases are available at [server_test.go](./service/internal/server/server_test.go).
 
